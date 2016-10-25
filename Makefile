@@ -5,7 +5,7 @@ USERID=EDIT_MAKE_FILE
 CLASSES=
 DEPS=
 
-all: web-client web-server server client
+all: web-client web-server server client showip
 
 web-client: HttpMessage.o
 	$(CXX) -o $@ $^ $(CXXFLAGS) $@.cpp
@@ -17,6 +17,9 @@ server:
 	$(CXX) -o $@ $^ $(CXXFLAGS) $@.cpp
 	
 client: 
+	$(CXX) -o $@ $^ $(CXXFLAGS) $@.cpp
+	
+showip: 
 	$(CXX) -o $@ $^ $(CXXFLAGS) $@.cpp
 
 HttpMessage:

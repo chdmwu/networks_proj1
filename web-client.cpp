@@ -32,19 +32,54 @@ bool writeResponseToFile(string filePath, string msg){
 }
 
 
+class urlparser{
+public:
+	string host;
+	int port;
+	string filePath;
+	urlparser(){
+		host = "localhost";
+		port = 4000;
+		filePath = "index.html";
+	}
+	void parse(string url){
+		string relevant = url.substr(7);
+		string hostport = relevant.substr(0, relevant.find("/"));
+		size_t colonpos = hostport.find(":");
+		string portstr;
+		if(colonpos != string::npos){
+			port = stoi(hostport.substr(colonpos+1));
+			host = hostport.substr(0, colonpos);
+		} else {
+			host = hostport;
+		}
+		filePath = relevant.substr(relevant.find("/"));
+		cout << host << endl;
+		cout << portstr << endl;
+		cout << filePath << endl;
+	}
+};
+
+
 int main(int argc, char *argv[]){
 
-	//TODO URLs
-	//string url(argv[1]);
+	string url;
+	if(argc > 1) {
+		url = string(argv[1]);
+	} else {
+		url = "http://localhost:4000/index.html";
+	}
+	urlparser parser;
+	parser.parse(url);
 
 
 	HttpRequest r;
 	r.setMethod("GET");
-	r.setPath("/index.html");
-	r.setVersion("HTTP/1.1");
-	r.setHost("localhost");
+	r.setPath(parser.filePath);
+	r.setVersion("HTTP/1.0");
+	r.setHost(parser.host);
 	r.setBody("");
-	string filePath = "deleteme.txt";
+	string filePath = parser.filePath;
 	string msg = r.createMessage();
 	cout << msg << endl;
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -82,7 +117,8 @@ int main(int argc, char *argv[]){
 	bool isOK = true;
 	bool done = false;
 	int numcalls = 0;
-	while(isOK && !done){
+	cout << "Receiving http response: " << endl;
+	while(isOK && !done && numcalls < 4){
 		size_t MAX_MSG_SIZE = 10000;
 		void* buf[MAX_MSG_SIZE];
 		memset(buf, '\0', sizeof(buf));
@@ -90,16 +126,15 @@ int main(int argc, char *argv[]){
 			perror("recv");
 			return 5;
 		}
-		//std::cout << "HTTP Response by server: " << endl;
-		//std::cout << string((char*) buf) << std::endl;
+
 		string responseMsg((char*) buf);
 		cout << responseMsg;
-
-		isOK = response.writeFile(responseMsg, filePath);
-		ifstream file(filePath, ios::binary | ios::ate);
+		string writeFilePath = "./delme/" + filePath; // TODO change this
+		isOK = response.writeFile(responseMsg, writeFilePath);
+		ifstream file(writeFilePath, ios::binary | ios::ate);
+		done = (file.tellg() == response.bodySize_);
 		cout << file.tellg() << endl;
 		cout << response.bodySize_ << endl;
-		done = (file.tellg() == response.bodySize_);
 		numcalls++;
 	}
 
@@ -109,3 +144,4 @@ int main(int argc, char *argv[]){
 
 	return 0;
 }
+

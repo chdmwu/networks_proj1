@@ -167,8 +167,10 @@ bool HttpResponse::writeFile(string msg, string filePath){
 	}
 	while(to.size()>0 && !inBody_){
 		std::getline(ss,to,'\n');
+		cout << "getting header" << to << "   " << to.find("Content-Length:") << endl;
 		if(to.find("Content-Length:") != string::npos){
 			vector<string> line = split(to, ' ');
+			cout << "found" << std::stoi(line.at(1));
 			bodySize_ = std::stoi(line.at(1));
 		}
 	}

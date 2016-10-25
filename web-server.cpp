@@ -103,20 +103,32 @@ vector<char> getFileBuffer(string filePath) {
 
 void handleRequest(string fileDir, int clientSockfd){
 	//receive the http request
-	size_t MAX_MSG_SIZE = 10000;
-	void* buf[MAX_MSG_SIZE];
-	memset(buf, 0, MAX_MSG_SIZE);
-	std::stringstream ss;
-	memset(buf, '\0', sizeof(buf));
-	if (recv(clientSockfd, buf, MAX_MSG_SIZE, 0) == -1) {
-		perror("recv");
+	bool done = false;
+	string fullRequest = "";
+	int numcalls = 0;
+	while(!done){
+		size_t MAX_MSG_SIZE = 10000;
+		void* buf[MAX_MSG_SIZE];
+		memset(buf, 0, MAX_MSG_SIZE);
+		std::stringstream ss;
+		memset(buf, '\0', sizeof(buf));
+		if (recv(clientSockfd, buf, MAX_MSG_SIZE, 0) == -1) {
+			perror("recv");
+		}
+		fullRequest += std::string((char*)buf);
+		if(fullRequest.size() >= 2 && fullRequest.substr(fullRequest.length() - 2) == "\n\n") {
+			done = true;
+		}
+		if(fullRequest.size() >= 4 && fullRequest.substr(fullRequest.length() - 4) == "\r\n\r\n") {
+			done = true;
+		}
+		numcalls++;
 	}
-	std::string str((char*)buf);
+
 	HttpRequest request;
-	bool goodRequest = request.consumeMessage(str);
-	cout << goodRequest << endl;
+	bool goodRequest = request.consumeMessage(fullRequest);
 	cout << "HTTP Request by client:" << endl;
-	cout << str << endl;
+	cout << fullRequest << endl;
 
 	//get the requested file
 	HttpResponse response;
@@ -134,6 +146,7 @@ void handleRequest(string fileDir, int clientSockfd){
 		response.setStatus("200 OK");
 		response.setLength(std::to_string(fileBuffer.size()-1)); //-1 because of null terminator
 		response.setBody(fileBody);
+		cout << "filesize " << response.body_.size() << endl;
 	} else {
 		cout << "404 Not Found" << endl;
 		response.setStatus("404 Not Found");
@@ -141,6 +154,7 @@ void handleRequest(string fileDir, int clientSockfd){
 		response.setBody("");
 	}
 	string responseMsg = response.createMessage();
+	cout << responseMsg << endl;
 	if (send(clientSockfd, responseMsg.c_str(), responseMsg.size(), 0) == -1){
 		perror("send");
 	}
