@@ -16,7 +16,7 @@
 
 using namespace std;
 vector<char> getFileBuffer(string filePath);
-void handleRequest(HttpRequest request, string fileDir, int clientSockfd);
+void handleRequest(string fileDir, int clientSockfd);
 
 int main(int argc, char *argv[])
 {
@@ -64,58 +64,30 @@ int main(int argc, char *argv[])
 		return 3;
 	}
 
-	// accept a new connection
-	struct sockaddr_in clientAddr;
-	socklen_t clientAddrSize = sizeof(clientAddr);
-	int clientSockfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrSize);
+	bool runServer = true;
 
-	if (clientSockfd == -1) {
-		perror("accept");
-		return 4;
+
+	while(runServer){
+		// accept a new connection
+		struct sockaddr_in clientAddr;
+		socklen_t clientAddrSize = sizeof(clientAddr);
+		int clientSockfd = accept(sockfd, (struct sockaddr*)&clientAddr, &clientAddrSize);
+
+		if (clientSockfd == -1) {
+			perror("accept");
+			return 4;
+		}
+
+		char ipstr[INET_ADDRSTRLEN] = {'\0'};
+		inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
+		std::cout << "Accept a connection from: " << ipstr << ":" <<
+				ntohs(clientAddr.sin_port) << std::endl;
+
+		//spawn a new thread to handle the incoming request
+		std::thread requestThread(handleRequest, fileDir, clientSockfd);
+		requestThread.detach();
 	}
 
-	char ipstr[INET_ADDRSTRLEN] = {'\0'};
-	inet_ntop(clientAddr.sin_family, &clientAddr.sin_addr, ipstr, sizeof(ipstr));
-	std::cout << "Accept a connection from: " << ipstr << ":" <<
-			ntohs(clientAddr.sin_port) << std::endl;
-
-	// read/write data from/into the connection
-	//bool isEnd = false;
-	size_t MAX_MSG_SIZE = 8000;
-	void* buf[MAX_MSG_SIZE];
-	memset(buf, 0, MAX_MSG_SIZE);
-	std::stringstream ss;
-	memset(buf, '\0', sizeof(buf));
-	if (recv(clientSockfd, buf, MAX_MSG_SIZE, 0) == -1) {
-		perror("recv");
-		return 5;
-	}
-	std::string str((char*)buf);
-	HttpRequest request;
-	request.consumeMessage(str);
-
-	/*
-	cout << "HTTP Request by client:" << endl;
-	cout << request.createMessage() << endl;
-	cout << string(getFileBuffer(fileDir + request.path_).data()) << endl;
-	vector<char> fileBuffer = getFileBuffer(fileDir + request.path_);
-	string fileBody = string(fileBuffer.data());
-
-	HttpResponse response;
-	response.setVersion("HTTP/1.0");
-	response.setStatus("200 OK");
-	response.setLength(std::to_string(fileBuffer.size()));
-	response.setBody(fileBody);
-	string responseMsg = response.createMessage();
-	 if (send(clientSockfd, responseMsg.c_str(), responseMsg.size(), 0) == -1){
-	  perror("send");
-	  return 6;
-	}
-	*/
-	std::thread t1(handleRequest, request, fileDir, clientSockfd);
-	t1.join();
-
-	close(clientSockfd);
 }
 
 vector<char> getFileBuffer(string filePath) {
@@ -129,20 +101,48 @@ vector<char> getFileBuffer(string filePath) {
 	return buffer;
 }
 
-void handleRequest(HttpRequest request, string fileDir, int clientSockfd){
+void handleRequest(string fileDir, int clientSockfd){
+	//receive the http request
+	size_t MAX_MSG_SIZE = 10000;
+	void* buf[MAX_MSG_SIZE];
+	memset(buf, 0, MAX_MSG_SIZE);
+	std::stringstream ss;
+	memset(buf, '\0', sizeof(buf));
+	if (recv(clientSockfd, buf, MAX_MSG_SIZE, 0) == -1) {
+		perror("recv");
+	}
+	std::string str((char*)buf);
+	HttpRequest request;
+	bool goodRequest = request.consumeMessage(str);
+	cout << goodRequest << endl;
 	cout << "HTTP Request by client:" << endl;
-	cout << request.createMessage() << endl;
-	cout << string(getFileBuffer(fileDir + request.path_).data()) << endl;
-	vector<char> fileBuffer = getFileBuffer(fileDir + request.path_);
-	string fileBody = string(fileBuffer.data());
+	cout << str << endl;
 
+	//get the requested file
 	HttpResponse response;
 	response.setVersion("HTTP/1.0");
-	response.setStatus("200 OK");
-	response.setLength(std::to_string(fileBuffer.size()));
-	response.setBody(fileBody);
-	string responseMsg = response.createMessage();
-	 if (send(clientSockfd, responseMsg.c_str(), responseMsg.size(), 0) == -1){
-	  perror("send");
+	string fullFilePath = fileDir + request.path_;
+	if(!goodRequest){
+		cout << "400 Bad Request" << endl;
+		response.setStatus("400 Bad Request");
+		response.setLength("0");
+		response.setBody("");
+	} else if(ifstream(fullFilePath)){
+		cout << string(getFileBuffer(fullFilePath).data()) << endl;
+		vector<char> fileBuffer = getFileBuffer(fileDir + request.path_);
+		string fileBody = string(fileBuffer.data());
+		response.setStatus("200 OK");
+		response.setLength(std::to_string(fileBuffer.size()-1)); //-1 because of null terminator
+		response.setBody(fileBody);
+	} else {
+		cout << "404 Not Found" << endl;
+		response.setStatus("404 Not Found");
+		response.setLength("0");
+		response.setBody("");
 	}
+	string responseMsg = response.createMessage();
+	if (send(clientSockfd, responseMsg.c_str(), responseMsg.size(), 0) == -1){
+		perror("send");
+	}
+	close(clientSockfd);
 }

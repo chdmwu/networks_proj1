@@ -64,7 +64,7 @@ main()
 
   while (!isEnd) {
     memset(buf, '\0', sizeof(buf));
-
+    std::cout << "doing a recv" <<std::endl;
     if (recv(clientSockfd, buf, 20, 0) == -1) {
       perror("recv");
       return 5;

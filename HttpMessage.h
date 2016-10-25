@@ -16,7 +16,7 @@ public:
 	HttpMessage();
 	virtual ~HttpMessage();
 	virtual string createMessage();
-	virtual void consumeMessage(string msg);
+	virtual bool consumeMessage(string msg);
 	//virtual vector<uint8_t> encode() = 0;
 	void setVersion(string version);
 	void setBody(string body);
@@ -35,7 +35,7 @@ public:
 	void setPath(string path);
 	void setHost(string host);
 	string createMessage() override;
-	void consumeMessage(string msg) override;
+	bool consumeMessage(string msg) override;
 
 	string url_;
 	string method_;
@@ -49,10 +49,14 @@ public:
 	~HttpResponse();
 	void setStatus(string status);
 	string createMessage() override;
-	void consumeMessage(string msg) override;
+	bool consumeMessage(string msg) override;
 	void setLength(string length);
+	bool writeFile(string msg, string filePath);
 
 	string status_;
 	string length_;
+	int bodySize_;
+	bool inBody_;
+	bool OK_;
 };
 #endif /* HTTPREQUEST_H_ */
