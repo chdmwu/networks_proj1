@@ -26,6 +26,19 @@ bool isOK(string status){
 	return status == "200 OK" || status == "200";
 }
 
+vector<char> getLineFromVec(vector<char> vec, int start){
+	int curr = start;
+	char lastChar = 'x';
+	vector<char> line;
+	while(lastChar != '\n'){
+		lastChar = vec.at(curr);
+		line.push_back(lastChar);
+		curr++;
+	}
+	line.pop_back(); //delete trailing newline
+	return line;
+}
+
 vector<string> split(string str, char delimiter) {
   vector<string> internal;
   stringstream ss(str); // Turn the string into a stream.
@@ -140,9 +153,9 @@ string HttpResponse::createMessage(){
 	string message = version_ + " " + status_ + "\n";
 	message += "Content-Length: " + length_ + "\n";
 	message += "\n";
-	if(body_.length() > 0){
-		message += body_;
-	}
+	//if(body_.length() > 0){
+	//	message += body_;
+	//}
 	return message;
 }
 bool HttpResponse::consumeMessage(string msg){
@@ -150,37 +163,43 @@ bool HttpResponse::consumeMessage(string msg){
 }
 
 //returns if this reponse is ok
-bool HttpResponse::writeFile(string msg, string filePath){
-	istringstream ss(msg);
-	string to = "placeholder";
+bool HttpResponse::writeFile(vector<char> recved, string filePath){
 	// deal with status
+	vector<char> curr;
+	int currInd = 0;
+	cout << recved.size() << endl;
 	if(!inBody_){
 		if(!OK_){
-			std::getline(ss,to,'\n');
-			if(to == "HTTP/1.0 200 OK"){
+			curr = getLineFromVec(recved, currInd);
+			currInd += curr.size() + 1;
+			string currStr = string(curr.begin(),curr.end());
+			if( currStr == "HTTP/1.0 200 OK"){
 				OK_ = true;
+				cout  << currStr << endl;
 				remove(filePath.c_str()); //delete old file if it exists
 			} else {
 				return false;
 			}
 		}
 	}
-	while(to.size()>0 && !inBody_){
-		std::getline(ss,to,'\n');
-		cout << "getting header" << to << "   " << to.find("Content-Length:") << endl;
-		if(to.find("Content-Length:") != string::npos){
-			vector<string> line = split(to, ' ');
+	while(curr.size()>0 && !inBody_){
+		curr = getLineFromVec(recved, currInd);
+		currInd += curr.size() + 1;
+		string currStr = string(curr.begin(),curr.end());
+		cout << "found header " << currStr.size() << endl;
+		if(currStr.find("Content-Length:") != string::npos){
+			vector<string> line = split(currStr, ' ');
 			cout << "found" << std::stoi(line.at(1));
 			bodySize_ = std::stoi(line.at(1));
 		}
 	}
-	if(to.size() == 0) {
+	if(curr.size() == 0) {
 		inBody_ = true;
 	}
 	if(inBody_){
-	ofstream myfile;
-	 myfile.open(filePath.c_str(), std::ios_base::app);
-		myfile << ss.rdbuf();
+		ofstream myfile;
+		myfile.open(filePath.c_str(), std::ios_base::app | ios::binary | ios::out);
+		myfile.write(recved.data() + currInd, recved.size() - currInd);
 	}
 	return true;
 }

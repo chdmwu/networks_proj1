@@ -118,19 +118,20 @@ int main(int argc, char *argv[]){
 	bool done = false;
 	int numcalls = 0;
 	cout << "Receiving http response: " << endl;
-	while(isOK && !done && numcalls < 4){
+	while(isOK && !done){
 		size_t MAX_MSG_SIZE = 10000;
 		void* buf[MAX_MSG_SIZE];
 		memset(buf, '\0', sizeof(buf));
-		if (recv(sockfd, buf, MAX_MSG_SIZE, 0) == -1) {
+		int bytesRecved = recv(sockfd, buf, MAX_MSG_SIZE, 0);
+		if (bytesRecved == -1) {
 			perror("recv");
 			return 5;
 		}
+		vector<char> recved;
+		recved.assign((char*)buf, (char*)buf + bytesRecved);
 
-		string responseMsg((char*) buf);
-		cout << responseMsg;
 		string writeFilePath = "./delme/" + filePath; // TODO change this
-		isOK = response.writeFile(responseMsg, writeFilePath);
+		isOK = response.writeFile(recved, writeFilePath);
 		ifstream file(writeFilePath, ios::binary | ios::ate);
 		done = (file.tellg() == response.bodySize_);
 		cout << file.tellg() << endl;

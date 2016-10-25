@@ -92,12 +92,12 @@ int main(int argc, char *argv[])
 
 vector<char> getFileBuffer(string filePath) {
 	std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-	std::streamsize size = file.tellg() + 1;
+	std::streamsize size = file.tellg();
 	file.seekg(0, std::ios::beg);
 
 	std::vector<char> buffer(size);
 	file.read(buffer.data(), size);
-	buffer.back() = '\0';
+	//buffer.back() = '\0';
 	return buffer;
 }
 
@@ -138,25 +138,41 @@ void handleRequest(string fileDir, int clientSockfd){
 		cout << "400 Bad Request" << endl;
 		response.setStatus("400 Bad Request");
 		response.setLength("0");
-		response.setBody("");
-	} else if(ifstream(fullFilePath)){
-		cout << string(getFileBuffer(fullFilePath).data()) << endl;
-		vector<char> fileBuffer = getFileBuffer(fileDir + request.path_);
-		string fileBody = string(fileBuffer.data());
+		string msg = response.createMessage();
+		if (send(clientSockfd, msg.c_str(), msg.size(), 0) == -1){
+				perror("send");
+		}
+
+	} else if(ifstream(fullFilePath, ios::binary|ios::ate)){
+		//cout << string(getFileBuffer(fullFilePath).data()) << endl;
+		vector<char> fileBytes = getFileBuffer(fileDir + request.path_);
+		cout << fileBytes.size() << endl;
+		cout << "file bytes size " << fileBytes.size() << endl;
+
 		response.setStatus("200 OK");
-		response.setLength(std::to_string(fileBuffer.size()-1)); //-1 because of null terminator
-		response.setBody(fileBody);
-		cout << "filesize " << response.body_.size() << endl;
+		response.setLength(std::to_string(fileBytes.size())); //-1 because of null terminator
+		string httpMsg = response.createMessage();
+
+		vector<char> httpMsgBytes(httpMsg.begin(), httpMsg.end());
+		cout << "header size " << httpMsgBytes.size() << endl;
+
+		httpMsgBytes.insert(httpMsgBytes.end(), fileBytes.begin(), fileBytes.end());
+		cout << "total bytes size " << httpMsgBytes.size() << endl;
+
+		string msg = response.createMessage();
+		if (send(clientSockfd, httpMsgBytes.data(), httpMsgBytes.size(), 0) == -1){
+				perror("send");
+		}
+
 	} else {
 		cout << "404 Not Found" << endl;
 		response.setStatus("404 Not Found");
 		response.setLength("0");
-		response.setBody("");
+		string msg = response.createMessage();
+		if (send(clientSockfd, msg.c_str(), msg.size(), 0) == -1){
+				perror("send");
+		}
 	}
-	string responseMsg = response.createMessage();
-	cout << responseMsg << endl;
-	if (send(clientSockfd, responseMsg.c_str(), responseMsg.size(), 0) == -1){
-		perror("send");
-	}
+
 	close(clientSockfd);
 }

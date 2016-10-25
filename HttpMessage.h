@@ -51,7 +51,7 @@ public:
 	string createMessage() override;
 	bool consumeMessage(string msg) override;
 	void setLength(string length);
-	bool writeFile(string msg, string filePath);
+	bool writeFile(vector<char> recved, string filePath);
 
 	string status_;
 	string length_;
