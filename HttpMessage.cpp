@@ -167,7 +167,6 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 	// deal with status
 	vector<char> curr;
 	int currInd = 0;
-	cout << recved.size() << endl;
 	if(!inBody_){
 		if(!OK_){
 			curr = getLineFromVec(recved, currInd);
@@ -175,7 +174,6 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 			string currStr = string(curr.begin(),curr.end());
 			if( currStr == "HTTP/1.0 200 OK"){
 				OK_ = true;
-				cout  << currStr << endl;
 				remove(filePath.c_str()); //delete old file if it exists
 			} else {
 				return false;
@@ -186,15 +184,17 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 		curr = getLineFromVec(recved, currInd);
 		currInd += curr.size() + 1;
 		string currStr = string(curr.begin(),curr.end());
-		cout << "found header " << currStr.size() << endl;
 		if(currStr.find("Content-Length:") != string::npos){
 			vector<string> line = split(currStr, ' ');
-			cout << "found" << std::stoi(line.at(1));
 			bodySize_ = std::stoi(line.at(1));
 		}
 	}
 	if(curr.size() == 0) {
 		inBody_ = true;
+		if(bodySize_ == -1){
+			//Didnt find body size.
+			cout << "Http response lacks Content-Length header" << endl;
+		}
 	}
 	if(inBody_){
 		ofstream myfile;

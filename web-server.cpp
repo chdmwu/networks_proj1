@@ -7,6 +7,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <thread>
+#include <netdb.h>
+
 
 #include <fstream>
 #include <iostream>
@@ -18,11 +20,45 @@ using namespace std;
 vector<char> getFileBuffer(string filePath);
 void handleRequest(string fileDir, int clientSockfd);
 
+string getIP(string host){
+	struct addrinfo hints;
+	  struct addrinfo* res;
+
+	  // prepare hints
+	  memset(&hints, 0, sizeof(hints));
+	  hints.ai_family = AF_INET; // IPv4
+	  hints.ai_socktype = SOCK_STREAM; // TCP
+
+	  // get address
+	  int status = 0;
+	  if ((status = getaddrinfo(host.c_str(), "80", &hints, &res)) != 0) {
+	    std::cerr << "getaddrinfo: " << gai_strerror(status) << std::endl;
+	  }
+
+	  std::cout << "IP addresses for " << host << ": " << std::endl;
+
+	  for(struct addrinfo* p = res; p != 0; p = p->ai_next) {
+	    // convert address to IPv4 address
+	    struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+
+	    // convert the IP to a string and print it:
+	    char ipstr[INET_ADDRSTRLEN] = {'\0'};
+	    inet_ntop(p->ai_family, &(ipv4->sin_addr), ipstr, sizeof(ipstr));
+	    std::cout << "  " << ipstr << std::endl;
+	    // std::cout << "  " << ipstr << ":" << ntohs(ipv4->sin_port) << std::endl;
+	    return string(ipstr);
+	  }
+
+	  freeaddrinfo(res); // free the linked list
+	  return "";
+}
+
 int main(int argc, char *argv[])
 {
 	string hostname;
 	int port;
 	string fileDir;
+	string ip;
 
 	if(argc <= 1){
 		hostname = "localhost";
@@ -34,6 +70,9 @@ int main(int argc, char *argv[])
 		port = atoi(argv[2]);
 		fileDir = argv[3];
 	}
+
+	ip = getIP(hostname);
+
 	std::cout << "Creating server" << std::endl;
 	// create a socket using TCP IP
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,7 +89,7 @@ int main(int argc, char *argv[])
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);     // short, network byte order
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_addr.s_addr = inet_addr(ip.c_str());
 	memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
 
 	if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
@@ -133,6 +172,9 @@ void handleRequest(string fileDir, int clientSockfd){
 	//get the requested file
 	HttpResponse response;
 	response.setVersion("HTTP/1.0");
+	if(request.path_ == "/"){
+		request.path_ = "/index.html";
+	}
 	string fullFilePath = fileDir + request.path_;
 	if(!goodRequest){
 		cout << "400 Bad Request" << endl;
@@ -144,7 +186,6 @@ void handleRequest(string fileDir, int clientSockfd){
 		}
 
 	} else if(ifstream(fullFilePath, ios::binary|ios::ate)){
-		//cout << string(getFileBuffer(fullFilePath).data()) << endl;
 		vector<char> fileBytes = getFileBuffer(fileDir + request.path_);
 		cout << fileBytes.size() << endl;
 		cout << "file bytes size " << fileBytes.size() << endl;
