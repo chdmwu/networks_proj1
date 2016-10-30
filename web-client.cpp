@@ -18,11 +18,11 @@
 using namespace std;
 
 
-bool writeResponseToFile(string filePath, string msg){
+bool writeResponseToFile(string fileName, string msg){
 	istringstream ss(msg);
 	string temp;
 	bool inBody = false;
-	std::ofstream out(filePath);
+	std::ofstream out(fileName);
 	while(std::getline(ss,temp,'\n')){
 		if(inBody){
 			out << temp << endl;
@@ -71,10 +71,12 @@ public:
 	string host;
 	int port;
 	string filePath;
+    string fileName;
 	urlparser(){
 		host = "localhost";
 		port = 4000;
 		filePath = "/index.html";
+        fileName = "/index.html";
 	}
 	void parse(string url){
 		int offset = 0;
@@ -92,7 +94,17 @@ public:
 			port = 80; //default http port, TODO change?
 			host = hostport;
 		}
-		filePath = relevant.substr(relevant.find("/"));
+        if (relevant.find("/") != string::npos) {
+            filePath = relevant.substr(relevant.find("/"));
+            fileName = relevant.substr(relevant.find_last_of("/"));
+            if (filePath == "/") {
+                fileName = "/index.html";
+            }
+        }
+        else {
+            filePath="";
+            fileName="";
+        }
 	}
 };
 
@@ -122,11 +134,10 @@ int main(int argc, char *argv[]){
 		r.setVersion("HTTP/1.0");
 		r.setHost(parser.host);
 		r.setBody("");
-		string filePath = "." + parser.filePath;
+		string fileName = "." + parser.fileName;
 		string msg = r.createMessage();
 		string ip = getIP(r.host_);
 		int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
 		struct sockaddr_in serverAddr;
 		serverAddr.sin_family = AF_INET;
 		serverAddr.sin_port = htons(parser.port);     // short, network byte order
@@ -174,16 +185,21 @@ int main(int argc, char *argv[]){
 			vector<char> recved;
 			recved.assign((char*)buf, (char*)buf + bytesRecved);
 
-			string writeFilePath = filePath;
-			isOK = response.writeFile(recved, writeFilePath);
-			ifstream file(writeFilePath, ios::binary | ios::ate);
-			done = (file.tellg() == response.bodySize_);
+			string writeFileName = fileName;
+			isOK = response.writeFile(recved, writeFileName);
+			ifstream file(writeFileName, ios::binary | ios::ate);
+            if (response.bodySize_ != -1) {
+                done = (file.tellg() == response.bodySize_);
+            }
+            else {
+                done = bytesRecved == 0;
+            }
 			numcalls++;
 		}
 		if(!isOK) {
 			cout << "Received an error as http response... " << endl;
 		} else if (done) {
-			cout << "File successfully written: " << filePath << endl;
+			cout << "File successfully written: " << fileName << endl;
 		}
 		close(sockfd);
 		cout << "Connection closed..." << endl;

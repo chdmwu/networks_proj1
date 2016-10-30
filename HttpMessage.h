@@ -10,7 +10,8 @@
 
 #include <string>
 #include <vector>
-using namespace std;
+using std::string;
+using std::vector;
 class HttpMessage {
 public:
 	HttpMessage();
@@ -58,5 +59,6 @@ public:
 	int bodySize_;
 	bool inBody_;
 	bool OK_;
+	string trackCRLF_;
 };
 #endif /* HTTPREQUEST_H_ */

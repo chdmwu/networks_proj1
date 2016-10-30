@@ -9,6 +9,12 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+using std::stringstream;
+using std::istringstream;
+using std::cout;
+using std::endl;
+using std::ofstream;
+using std::ios;
 
 bool checkMethod(string str){
 	return str == "GET";
@@ -71,6 +77,7 @@ HttpResponse::HttpResponse() {
 	inBody_=false;
 	OK_=false;
 	bodySize_ = -1;
+	trackCRLF_ = "";
 	// TODO Auto-generated constructor stub
 }
 
@@ -134,7 +141,7 @@ bool HttpRequest::consumeMessage(string msg){
 	getline(lineStream, version_, ' ');
 	if(!checkVersion(version_)) {cout << "version fail" << endl; return false;}
 	//get header info
-	while(getline(ss, to, '\n')){
+	while(std::getline(ss, to, '\n')){
 		//do nothing? maybe check headers TODO
 	}
 	return true;
@@ -167,12 +174,17 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 	// deal with status
 	vector<char> curr;
 	int currInd = 0;
+	string fullBlock="";
+	fullBlock += trackCRLF_;
+	fullBlock += string(recved.begin(),recved.end());;
+    //cout << fullBlock;
 	if(!inBody_){
 		if(!OK_){
 			curr = getLineFromVec(recved, currInd);
 			currInd += curr.size() + 1;
 			string currStr = string(curr.begin(),curr.end());
-			if( currStr == "HTTP/1.0 200 OK"){
+			cout << currStr << endl;
+            if (fullBlock.find("HTTP/1.0 200 OK") != std::string::npos) {
 				OK_ = true;
 				remove(filePath.c_str()); //delete old file if it exists
 			} else {
@@ -180,22 +192,26 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 			}
 		}
 	}
-	while(curr.size()>0 && !inBody_){
-		curr = getLineFromVec(recved, currInd);
-		currInd += curr.size() + 1;
-		string currStr = string(curr.begin(),curr.end());
-		if(currStr.find("Content-Length:") != string::npos){
+	if (!inBody_){
+		if(fullBlock.find("Content-Length:") != string::npos){
+			curr = getLineFromVec(recved, fullBlock.find("Content-Length:"));
+			string currStr = string(curr.begin(),curr.end());
 			vector<string> line = split(currStr, ' ');
 			bodySize_ = std::stoi(line.at(1));
 		}
-	}
-	if(curr.size() == 0) {
-		inBody_ = true;
-		if(bodySize_ == -1){
-			//Didnt find body size.
-			cout << "Http response lacks Content-Length header" << endl;
+		if (fullBlock.find("\r\n\r\n") != string::npos){
+			inBody_ = true;
+			currInd = fullBlock.find("\r\n\r\n")+4;
+		}
+		else if (fullBlock.find("\n\n") != string::npos){
+			inBody_ = true;
+			currInd = fullBlock.find("\n\n")+2;
+		}
+		else {
+			trackCRLF_=fullBlock.substr( std::max(0,int(fullBlock.length()) - 4));
 		}
 	}
+
 	if(inBody_){
 		ofstream myfile;
 		myfile.open(filePath.c_str(), std::ios_base::app | ios::binary | ios::out);

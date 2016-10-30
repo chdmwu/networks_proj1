@@ -16,7 +16,12 @@
 
 #include "HttpMessage.h"
 
-using namespace std;
+using std::string;
+using std::cout;
+using std::endl;
+using std::ios;
+using std::ifstream;
+
 vector<char> getFileBuffer(string filePath);
 void handleRequest(string fileDir, int clientSockfd);
 
