@@ -184,7 +184,7 @@ bool HttpResponse::writeFile(vector<char> recved, string filePath){
 			currInd += curr.size() + 1;
 			string currStr = string(curr.begin(),curr.end());
 			cout << currStr << endl;
-            if (fullBlock.find("200 OK") != std::string::npos) {
+            if (fullBlock.find("HTTP/1.0 200 OK") != std::string::npos || fullBlock.find("HTTP/1.1 200 OK") != std::string::npos) {
 				OK_ = true;
 				remove(filePath.c_str()); //delete old file if it exists
 			} else {
